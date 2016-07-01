@@ -1,0 +1,66 @@
+---
+title: "Combination By GC content"
+author: "xiucheng quek"
+date: "01 July 2016"
+output: word_document
+---
+
+This document is written to find the optimized parameters on alignments grouped by their gc content
+
+
+Read in tables, there are 3 tables. `ranked_gc.tsv` contains the cumulative score of the top parameters. `combination.index.txt` contains the table that maps the combination the the combination_id in `ranked.tsv`. `seq.index.txt` containst the index for the sequence pair
+
+For bin labels, sequences are place in the bin if they have GC content >= lower limit but < than the larger limit. 
+Hence, 10-20 will contains sequence pair with GC >= 10 but <20.
+
+## Dependencies
+
+```{r}
+library(ggplot2)
+library(reshape2)
+library(dplyr)
+```
+
+
+```{r}
+rankTable <- read.table('ranked_gc.tsv', sep='\t', header=TRUE)
+comb <- read.table('combination.index.txt', sep='\t', header=TRUE)
+seq_pair <- read.table('seq.index.txt', sep='\t', header=TRUE)
+```
+
+
+## Get the top 10 sci score
+
+
+The average rank score ( y-axis, the lower the better) and the x-axis is the gc bin group. The number above represent the number of sequences in each gc bin.
+```{r}
+
+mergedTable <- merge(rankTable, comb, by.x='combination', by.y='index')
+mergedTable$ave <- mergedTable$score / mergedTable$no_of_seq
+bin_sizes <- dplyr::select(mergedTable, no_of_seq, gc) %>% distinct
+bin_sizes$labels<- paste0('n=' , bin_sizes$no_of_seq)
+ggplot(mergedTable, aes(x=gc, y=ave)) + geom_jitter(aes(color=as.factor(t))) + geom_text(data=bin_sizes, aes(x=gc, y=2.6, label=labels), size=3)
+ggplot(mergedTable, aes(x=gc, y=ave)) + geom_jitter(aes(color=as.factor(k))) + geom_text(data=bin_sizes, aes(x=gc, y=2.6, label=labels), size=3)                                                                
+by_gc <- dplyr::group_by(mergedTable, gc) 
+top_scores <- dplyr::filter(by_gc, ave == min(ave))
+top_scores <- as.data.frame(top_scores)
+write.table(top_scores[order(top_scores$gc),], 'topscore_gc.tsv')
+
+```
+
+## check occurence of t and k
+
+The only difference between the GC content is the value of t. 
+GC content of sueqnces between 40-50 prefer to t = 0.4.
+```{r}
+t_k_scores <- dplyr::select(top_scores, gc, t, k)
+ggplot(t_k_scores, aes(x=t)) + geom_bar()
+ggplot(top_scores, aes(x=t)) + geom_bar() + facet_wrap(~gc)
+ggplot(top_scores, aes(x=as.factor(t))) + geom_bar() + facet_wrap(~gc)
+ggplot(top_scores, aes(x=as.factor(k))) + geom_bar() + facet_wrap(~gc)
+ggplot(top_scores, aes(x=as.factor(T))) + geom_bar() + facet_wrap(~gc)
+ggplot(top_scores, aes(x=as.factor(S))) + geom_bar() + facet_wrap(~gc)
+```
+
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
